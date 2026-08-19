@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AyurWell — Ancient Wisdom, Modern Wellness</title>
+
+<!-- Fonts: Playfair Display for elevated headings on the new app-like sections, Segoe UI stays as body face to match the original site -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Tailwind (utility layer used only for the NEW modules: Auth, Catalog, Doctors, Dashboard) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          gold:   { DEFAULT:'#C9A84C', light:'#E8D08A', dark:'#8B6914' },
+          sage:   { DEFAULT:'#3D5A4A', light:'#6B8F71' },
+          cream:  '#FAF7F0',
+          deep:   '#0D0A06',
+          terra:  '#B5522A',
+          vata:   '#93C4D8',
+          pitta:  '#F5A370',
+          kapha:  '#85BF85'
+        },
+        fontFamily: {
+          display: ['"Playfair Display"','serif'],
+          body: ['"Poppins"','"Segoe UI"','sans-serif']
+        }
+      }
+    }
+  }
+</script>
+
+<!-- Flatpickr (date/time picker used in the doctor-booking flow) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/themes/dark.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js"></script>
+
+<!-- AOS — scroll reveal used only inside the new sections (existing site already has its own .rv reveal system) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+
+<!-- Chart.js — dosha-history trend + routine adherence charts in the dashboard -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+
+<!-- Razorpay Checkout widget — real payment flow, see PAYMENT_CONFIG in script.js -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- CART OVERLAY + SIDEBAR -->
+<div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="cart-sidebar" id="cartSidebar">
+  <div class="cart-hdr">
+    <h3>🛒 Your Cart <span id="cartCountLabel" style="font-size:.75rem;font-weight:500;opacity:.55"></span></h3>
+    <button class="cart-close" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty" id="cartEmpty">
+      <div class="cart-empty-icon">🌿</div>
+      <div style="font-size:.95rem;font-weight:600">Your cart is empty</div>
+      <div style="font-size:.8rem;line-height:1.6">Add herbs from the shop below<br>to begin your wellness journey.</div>
+    </div>
+  </div>
+  <div class="cart-footer" id="cartFooter" style="display:none">
+    <div class="cart-subtotal"><span>Subtotal</span><span id="cartSubtotal">₹0</span></div>
+    <div class="cart-subtotal"><span>Delivery</span><span style="color:#85BF85">Free 🌿</span></div>
+    <div class="cart-total"><span>Total</span><span id="cartTotalAmt">₹0</span></div>
+    <button class="cart-cta" onclick="checkoutFromCart()">🔒 Proceed to Checkout</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Ayur<span>Well</span></div>
+  <ul>
+    <li><a href="#doshas">Doshas</a></li>
+    <li><a href="#catalog">Catalog</a></li>
+    <li><a href="#doctors">Doctors</a></li>
+    <li><a href="#notify">Reminders</a></li>
+    <li><a href="#pay">Checkout</a></li>
+  </ul>
+  <div class="nav-btns">
+    <button class="lm-toggle" onclick="toggleLM()" id="lmBtn" title="Toggle light mode">☀️ <span class="lm-knob"></span></button>
+    <div id="navAuthArea"><!-- populated by renderAuthNav() --></div>
+    <button class="cart-btn" onclick="openCart()">🛒 Cart <span class="cc" id="cc">0</span></button>
+  </div>
+</nav>
+
+<!-- HERO: DNA HELIX BG -->
+<section class="hero">
+  <canvas id="helixCanvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+  <div class="hero-content rv" style="position:relative;z-index:2;max-width:580px">
+    <div class="hero-tag">✦ 5000 Years of Ancient Wisdom</div>
+    <h1>Discover Your<br><em>Inner Balance</em><br>with Ayurveda</h1>
+    <p>Rooted in ancient science, tailored to your unique constitution. Find your dosha, get personalized remedies, and shop authentic herbs.</p>
+    <div class="hero-ctas">
+      <button class="cta1" onclick="openQuiz()">Find Your Dosha →</button>
+      <button class="cta2" onclick="document.getElementById('catalog').scrollIntoView({behavior:'smooth'})">Explore Shop</button>
+    </div>
+  </div>
+  <!-- HERO RIGHT: Ayurvedic GUI Visual -->
+  <div class="hero-visual rv" style="transition-delay:.3s">
+    <svg viewBox="0 0 460 500" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:460px;filter:drop-shadow(0 0 60px rgba(201,168,76,.18))">
+      <circle cx="230" cy="250" r="190" stroke="rgba(201,168,76,.08)" stroke-width="1" fill="none"/>
+      <circle cx="230" cy="250" r="165" stroke="rgba(201,168,76,.12)" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+      <ellipse cx="230" cy="250" rx="140" ry="55" stroke="rgba(61,90,74,.35)" stroke-width="1.5" fill="none"/>
+      <ellipse cx="230" cy="250" rx="140" ry="55" stroke="rgba(201,168,76,.15)" stroke-width="1" fill="none" transform="rotate(30 230 250)"/>
+      <ellipse cx="230" cy="250" rx="140" ry="55" stroke="rgba(201,168,76,.1)" stroke-width="1" fill="none" transform="rotate(-30 230 250)"/>
+      <radialGradient id="orbGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#E8D08A" stop-opacity="0.5"/>
+        <stop offset="50%" stop-color="#C9A84C" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="#C9A84C" stop-opacity="0"/>
+      </radialGradient>
+      <circle cx="230" cy="250" r="72" fill="url(#orbGrad)"/>
+      <circle cx="230" cy="250" r="52" stroke="rgba(201,168,76,.4)" stroke-width="1.5" fill="rgba(201,168,76,.06)"/>
+      <circle cx="230" cy="250" r="36" stroke="rgba(201,168,76,.6)" stroke-width="2" fill="rgba(201,168,76,.1)"/>
+      <text x="230" y="262" font-size="32" text-anchor="middle" fill="rgba(201,168,76,.85)" font-family="serif" class="svgOm">ॐ</text>
+      <circle cx="230" cy="110" r="10" fill="#FF4444" opacity="0.85"/>
+      <circle cx="230" cy="110" r="5" fill="#fff" opacity="0.4"/>
+      <text x="246" y="114" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Root</text>
+      <circle cx="340" cy="175" r="10" fill="#FF8C00" opacity="0.85"/>
+      <circle cx="340" cy="175" r="5" fill="#fff" opacity="0.4"/>
+      <text x="356" y="179" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Sacral</text>
+      <circle cx="375" cy="255" r="10" fill="#FFD700" opacity="0.85"/>
+      <circle cx="375" cy="255" r="5" fill="#fff" opacity="0.4"/>
+      <text x="391" y="259" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Solar</text>
+      <circle cx="340" cy="335" r="10" fill="#4CAF50" opacity="0.85"/>
+      <circle cx="340" cy="335" r="5" fill="#fff" opacity="0.4"/>
+      <text x="356" y="339" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Heart</text>
+      <circle cx="230" cy="390" r="10" fill="#2196F3" opacity="0.85"/>
+      <circle cx="230" cy="390" r="5" fill="#fff" opacity="0.4"/>
+      <text x="246" y="394" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Throat</text>
+      <circle cx="120" cy="335" r="10" fill="#7B1FA2" opacity="0.85"/>
+      <circle cx="120" cy="335" r="5" fill="#fff" opacity="0.4"/>
+      <text x="38" y="339" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">3rd Eye</text>
+      <circle cx="85" cy="255" r="10" fill="#9C27B0" opacity="0.85"/>
+      <circle cx="85" cy="255" r="5" fill="#fff" opacity="0.4"/>
+      <text x="18" y="259" font-size="10" fill="rgba(255,255,255,.55)" font-family="sans-serif" class="svgChakraLabel">Crown</text>
+      <circle cx="120" cy="175" r="10" fill="#E91E63" opacity="0.85"/>
+      <circle cx="120" cy="175" r="5" fill="#fff" opacity="0.4"/>
+      <line x1="230" y1="214" x2="230" y2="120" stroke="rgba(255,68,68,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="214" x2="332" y2="183" stroke="rgba(255,140,0,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="250" x2="365" y2="255" stroke="rgba(255,215,0,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="286" x2="332" y2="327" stroke="rgba(76,175,80,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="286" x2="230" y2="380" stroke="rgba(33,150,243,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="286" x2="128" y2="327" stroke="rgba(123,31,162,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="250" x2="95" y2="255" stroke="rgba(156,39,176,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="230" y1="214" x2="128" y2="183" stroke="rgba(233,30,99,.2)" stroke-width="1" stroke-dasharray="3 3"/>
+      <g>
+        <rect x="8" y="22" rx="12" ry="12" width="118" height="64" fill="rgba(61,90,74,.28)" stroke="rgba(107,143,113,.45)" stroke-width="1.2"/>
+        <text x="20" y="46" font-size="20" font-family="serif">🌿</text>
+        <text x="46" y="46" font-size="12" fill="rgba(255,255,255,.88)" font-weight="700" font-family="sans-serif" class="svgCardTitle">Prakriti</text>
+        <text x="46" y="64" font-size="10" fill="#C9A84C" font-family="sans-serif" class="svgCardSub">Your Constitution</text>
+      </g>
+      <g>
+        <rect x="334" y="22" rx="12" ry="12" width="118" height="64" fill="rgba(201,168,76,.16)" stroke="rgba(201,168,76,.4)" stroke-width="1.2"/>
+        <text x="346" y="46" font-size="20" font-family="serif">🔥</text>
+        <text x="372" y="46" font-size="12" fill="rgba(255,255,255,.88)" font-weight="700" font-family="sans-serif" class="svgCardTitle">Agni</text>
+        <text x="372" y="64" font-size="10" fill="#C9A84C" font-family="sans-serif" class="svgCardSub">Digestive Fire</text>
+      </g>
+      <g>
+        <rect x="334" y="414" rx="12" ry="12" width="118" height="64" fill="rgba(133,191,133,.13)" stroke="rgba(133,191,133,.38)" stroke-width="1.2"/>
+        <text x="346" y="438" font-size="20" font-family="serif">🌊</text>
+        <text x="372" y="438" font-size="12" fill="rgba(255,255,255,.88)" font-weight="700" font-family="sans-serif" class="svgCardTitle">Ojas</text>
+        <text x="372" y="456" font-size="10" fill="#C9A84C" font-family="sans-serif" class="svgCardSub">Vital Essence</text>
+      </g>
+      <g>
+        <rect x="8" y="414" rx="12" ry="12" width="118" height="64" fill="rgba(147,196,216,.12)" stroke="rgba(147,196,216,.35)" stroke-width="1.2"/>
+        <text x="20" y="438" font-size="20" font-family="serif">💨</text>
+        <text x="46" y="438" font-size="12" fill="rgba(255,255,255,.88)" font-weight="700" font-family="sans-serif" class="svgCardTitle">Prana</text>
+        <text x="46" y="456" font-size="10" fill="#C9A84C" font-family="sans-serif" class="svgCardSub">Life Force</text>
+      </g>
+      <path d="M 168 200 A 72 72 0 0 1 292 200" stroke="#93C4D8" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+      <path d="M 168 300 A 72 72 0 0 0 292 300" stroke="#85BF85" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+    </svg>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="strip">
+  <div class="strip-inner">
+    <span>✦</span>Vata Balance<span>✦</span>Pitta Harmony<span>✦</span>Kapha Strength<span>✦</span>Ashwagandha<span>✦</span>Brahmi<span>✦</span>Triphala<span>✦</span>Dosha Quiz<span>✦</span>Vata Balance<span>✦</span>Pitta Harmony<span>✦</span>Kapha Strength<span>✦</span>Ashwagandha<span>✦</span>Brahmi<span>✦</span>Triphala<span>✦</span>Dosha Quiz<span>✦</span>
+  </div>
+</div>
+
+<!-- TORUS: CHAKRA RING + TEXT -->
+<section class="torus-section" id="doshas">
+  <div class="torus-left rv">
+    <div class="sec-label">Seven Energy Centers</div>
+    <h2>Align Your Chakras,<br>Balance Your Life</h2>
+    <p>Ayurveda and the chakra system work in harmony. Each energy center governs specific organs, emotions, and doshas. When aligned, the body heals itself.</p>
+    <div class="chakra-list">
+      <div class="chakra-item"><div class="chakra-dot" style="background:#FF4444"></div><span>Muladhara — Root Chakra</span><small>Grounding</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#FF8C00"></div><span>Svadhisthana — Sacral Chakra</span><small>Creativity</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#FFD700"></div><span>Manipura — Solar Plexus</span><small>Willpower</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#4CAF50"></div><span>Anahata — Heart Chakra</span><small>Love</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#2196F3"></div><span>Vishuddha — Throat Chakra</span><small>Expression</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#7B1FA2"></div><span>Ajna — Third Eye</span><small>Intuition</small></div>
+      <div class="chakra-item"><div class="chakra-dot" style="background:#9C27B0"></div><span>Sahasrara — Crown Chakra</span><small>Enlightenment</small></div>
+    </div>
+  </div>
+  <div class="torus-right">
+    <canvas id="torusCanvas"></canvas>
+  </div>
+</section>
+
+<!-- DOSHAS + QUIZ MODAL -->
+<section class="doshas rv">
+  <div class="sec-center">
+    <div class="sec-label">The Three Energies</div>
+    <h2>Understanding the Doshas</h2>
+    <p>Your unique mind-body constitution — discover yours through our curated quiz.</p>
+    <button class="cta1" style="margin-top:1.5rem;display:inline-block" onclick="openQuiz()">🌿 Start Dosha Quiz →</button>
+  </div>
+  <div class="doshas-grid">
+    <div class="dosha-card dv rv" style="transition-delay:.1s">
+      <span class="dosha-icon">💨</span>
+      <h3>Vata — Air & Ether</h3>
+      <p>The energy of movement. Governs breathing, circulation, and the nervous system. Creative, quick-minded, and energetic.</p>
+      <div class="traits"><span class="trait tv">Creative</span><span class="trait tv">Energetic</span><span class="trait tv">Quick Mind</span><span class="trait tv">Flexible</span></div>
+    </div>
+    <div class="dosha-card dp rv" style="transition-delay:.2s">
+      <span class="dosha-icon">🔥</span>
+      <h3>Pitta — Fire & Water</h3>
+      <p>The energy of transformation. Governs digestion, metabolism, and intelligence. Focused, determined, and sharp.</p>
+      <div class="traits"><span class="trait tp">Intelligent</span><span class="trait tp">Focused</span><span class="trait tp">Leader</span><span class="trait tp">Confident</span></div>
+    </div>
+    <div class="dosha-card dk rv" style="transition-delay:.3s">
+      <span class="dosha-icon">🌊</span>
+      <h3>Kapha — Earth & Water</h3>
+      <p>The energy of structure. Governs growth, nourishment, and stability. Calm, loyal, and deeply compassionate.</p>
+      <div class="traits"><span class="trait tk">Calm</span><span class="trait tk">Patient</span><span class="trait tk">Grounded</span><span class="trait tk">Loving</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- QUIZ MODAL -->
+<div id="quizModal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem">
+<div id="quizBox" style="background:#111810;border:1px solid rgba(201,168,76,.2);border-radius:20px;max-width:560px;width:100%;padding:2.2rem;position:relative;max-height:90vh;overflow-y:auto">
+  <button onclick="closeQuiz()" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">✕</button>
+  <div id="quizProgress" style="height:4px;background:rgba(255,255,255,.1);border-radius:4px;margin-bottom:1.5rem;overflow:hidden"><div id="quizBar" style="height:100%;background:var(--gold);border-radius:4px;transition:.4s;width:0%"></div></div>
+  <div id="quizInner"></div>
+</div>
+</div>
+
+<!-- CRYSTAL HEX SHOP (featured teaser) -->
+<section class="hexshop rv" id="shop">
+  <div class="sec-center">
+    <div class="sec-label">Crystal Herbal Grid</div>
+    <h2>Shop Herbal Essentials</h2>
+    <p>Premium, ethically sourced Ayurvedic herbs — each attuned to your dosha profile.</p>
+  </div>
+  <div class="hex-scene">
+    <div class="hex-grid" id="hexGrid"></div>
+  </div>
+  <div style="text-align:center;margin-top:1rem">
+    <button class="cta1" onclick="document.getElementById('catalog').scrollIntoView({behavior:'smooth'})">Browse Full Catalog →</button>
+  </div>
+</section>
+
+<!-- ============ NEW: PRODUCT CATALOG ============ -->
+<section id="catalog" class="py-20 px-6 md:px-12 bg-[#0B0F0A] relative overflow-hidden" data-aos="fade-up">
+  <div class="text-center mb-12 max-w-xl mx-auto">
+    <div class="text-xs tracking-[.14em] uppercase text-gold font-semibold mb-2">The Full Apothecary</div>
+    <h2 class="font-display text-3xl md:text-4xl font-bold text-white mb-3">Herbal Catalog</h2>
+    <p class="text-white/50 text-sm leading-relaxed">Search, filter by dosha or category, and open any herb to see benefits, ingredients, and real reviews.</p>
+  </div>
+
+  <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
+    <!-- Filters -->
+    <aside class="bg-white/[.03] border border-white/[.07] rounded-2xl p-5 h-fit lg:sticky lg:top-24">
+      <div class="mb-5">
+        <div class="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Search</div>
+        <input id="catSearch" oninput="renderCatalog()" placeholder="Search herbs…" class="w-full bg-white/[.08] border border-white/[.15] rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-gold/60">
+      </div>
+      <div class="mb-5">
+        <div class="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Balances Dosha</div>
+        <div class="flex flex-wrap gap-2" id="catDoshaChips">
+          <button data-d="V" onclick="toggleChip(this,'dosha')" class="chip text-xs px-3 py-1 rounded-full border border-vata/40 text-vata">💨 Vata</button>
+          <button data-d="P" onclick="toggleChip(this,'dosha')" class="chip text-xs px-3 py-1 rounded-full border border-pitta/40 text-pitta">🔥 Pitta</button>
+          <button data-d="K" onclick="toggleChip(this,'dosha')" class="chip text-xs px-3 py-1 rounded-full border border-kapha/40 text-kapha">🌊 Kapha</button>
+        </div>
+      </div>
+      <div class="mb-5">
+        <div class="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Category</div>
+        <div class="flex flex-wrap gap-2" id="catCatChips">
+          <!-- populated by JS -->
+        </div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wide text-white/40 mb-2 font-semibold">Sort by</div>
+        <select id="catSort" onchange="renderCatalog()" class="w-full bg-white/[.08] border border-white/[.15] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-gold/60">
+          <option value="pop">Most Popular</option>
+          <option value="priceLow">Price: Low to High</option>
+          <option value="priceHigh">Price: High to Low</option>
+          <option value="rating">Highest Rated</option>
+        </select>
+      </div>
+      <button onclick="clearCatalogFilters()" class="mt-5 w-full text-xs text-white/40 hover:text-gold border border-white/10 rounded-lg py-2 transition">Clear filters</button>
+    </aside>
+
+    <!-- Product grid -->
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <span id="catCount" class="text-xs text-white/40"></span>
+      </div>
+      <div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+      <div id="catEmpty" class="hidden text-center py-16 text-white/40">
+        <div class="text-4xl mb-3">🌿</div>
+        <div class="font-semibold text-white/70 mb-1">No herbs match those filters</div>
+        <div class="text-sm">Try clearing a filter or searching a different term.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Product Detail Modal -->
+<div id="productModal" class="app-modal-overlay" onclick="if(event.target===this)closeProductModal()">
+  <div class="bg-[#111810] border border-gold/20 rounded-2xl max-w-3xl w-full max-h-[88vh] overflow-y-auto app-scroll relative" id="productModalInner"></div>
+</div>
+
+<!-- ============ NEW: DOCTOR CONSULTATION ============ -->
+<section id="doctors" class="py-20 px-6 md:px-12 bg-gradient-to-br from-[#0E1A12] to-[#060D08] relative overflow-hidden" data-aos="fade-up">
+  <div class="text-center mb-12 max-w-xl mx-auto">
+    <div class="text-xs tracking-[.14em] uppercase text-gold font-semibold mb-2">Talk to a Vaidya</div>
+    <h2 class="font-display text-3xl md:text-4xl font-bold text-white mb-3">Consult an Ayurvedic Doctor</h2>
+    <p class="text-white/50 text-sm leading-relaxed">Book a video or in-clinic consultation with a registered practitioner — get a routine built around your actual Prakriti, not just the quiz.</p>
+  </div>
+
+  <div class="max-w-6xl mx-auto">
+    <div class="flex flex-wrap gap-2 justify-center mb-8" id="docSpecFilter"></div>
+    <div id="doctorsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </div>
+</section>
+
+<!-- Booking Modal -->
+<div id="bookingModal" class="app-modal-overlay" onclick="if(event.target===this)closeBooking()">
+  <div class="bg-[#111810] border border-gold/20 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto app-scroll p-6 relative" id="bookingModalInner"></div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<section class="notif-section" id="notify">
+  <div class="rv">
+    <div style="margin-bottom:1.8rem;display:inline-block">
+      <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 4px 24px rgba(201,168,76,.25))">
+        <circle cx="90" cy="90" r="82" stroke="rgba(201,168,76,.18)" stroke-width="1.5" fill="none"/>
+        <circle cx="90" cy="90" r="70" stroke="rgba(201,168,76,.1)" stroke-width="1" fill="none"/>
+        <g opacity="0.7">
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.5)" transform="rotate(0 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.45)" transform="rotate(45 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.4)" transform="rotate(90 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.45)" transform="rotate(135 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.5)" transform="rotate(180 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.45)" transform="rotate(225 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.4)" transform="rotate(270 90 90)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="20" fill="rgba(61,90,74,.45)" transform="rotate(315 90 90)"/>
+        </g>
+        <g opacity="0.85">
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.4)" transform="rotate(0 90 90)"/>
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.35)" transform="rotate(60 90 90)"/>
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.4)" transform="rotate(120 90 90)"/>
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.35)" transform="rotate(180 90 90)"/>
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.4)" transform="rotate(240 90 90)"/>
+          <ellipse cx="90" cy="58" rx="6" ry="15" fill="rgba(201,168,76,.35)" transform="rotate(300 90 90)"/>
+        </g>
+        <circle cx="90" cy="90" r="22" fill="rgba(201,168,76,.12)" stroke="rgba(201,168,76,.4)" stroke-width="1.5"/>
+        <circle cx="90" cy="90" r="14" fill="rgba(201,168,76,.2)"/>
+        <circle cx="90" cy="90" r="5" fill="rgba(201,168,76,.9)"/>
+        <circle cx="90" cy="90" r="2.5" fill="#fff" opacity="0.6"/>
+        <circle cx="90" cy="8" r="3" fill="rgba(201,168,76,.6)"/>
+        <circle cx="90" cy="172" r="3" fill="rgba(201,168,76,.6)"/>
+        <circle cx="8" cy="90" r="3" fill="rgba(201,168,76,.6)"/>
+        <circle cx="172" cy="90" r="3" fill="rgba(201,168,76,.6)"/>
+        <circle cx="33.5" cy="33.5" r="2.5" fill="rgba(201,168,76,.4)"/>
+        <circle cx="146.5" cy="33.5" r="2.5" fill="rgba(201,168,76,.4)"/>
+        <circle cx="33.5" cy="146.5" r="2.5" fill="rgba(201,168,76,.4)"/>
+        <circle cx="146.5" cy="146.5" r="2.5" fill="rgba(201,168,76,.4)"/>
+        <path d="M52 110 Q45 95 50 80" stroke="rgba(107,143,113,.7)" stroke-width="1.5" fill="none"/>
+        <ellipse cx="45" cy="90" rx="6" ry="10" fill="rgba(107,143,113,.4)" transform="rotate(-30 45 90)"/>
+        <ellipse cx="50" cy="82" rx="5" ry="8" fill="rgba(107,143,113,.5)" transform="rotate(-15 50 82)"/>
+        <path d="M128 110 Q135 95 130 80" stroke="rgba(107,143,113,.7)" stroke-width="1.5" fill="none"/>
+        <ellipse cx="135" cy="90" rx="6" ry="10" fill="rgba(107,143,113,.4)" transform="rotate(30 135 90)"/>
+        <ellipse cx="130" cy="82" rx="5" ry="8" fill="rgba(107,143,113,.5)" transform="rotate(15 130 82)"/>
+      </svg>
+    </div>
+    <div class="sec-label">Stay Aligned</div>
+    <h2 style="font-size:clamp(1.8rem,3vw,2.4rem);font-weight:800;color:#fff;line-height:1.2;margin-bottom:1rem">Smart Wellness<br>Reminder System</h2>
+    <p style="color:rgba(255,255,255,.5);font-size:.92rem;line-height:1.85;margin-bottom:1.5rem">Never miss your herb intake, seasonal routine, or dosha check-in. AyurWell sends personalized reminders based on your constitution and the time of day.</p>
+    <div class="pay-feats">
+      <div class="pf"><div class="pf-ic">⏰</div>Daily herb & routine reminders</div>
+      <div class="pf"><div class="pf-ic">📅</div>Seasonal Ayurvedic routine shifts</div>
+      <div class="pf"><div class="pf-ic">🛒</div>Restock alerts for your essentials</div>
+      <div class="pf"><div class="pf-ic">🔔</div>Firebase FCM + email via Nodemailer</div>
+    </div>
+  </div>
+  <div class="rv" style="transition-delay:.15s">
+    <div class="notif-panel">
+      <div class="notif-hdr"><h4>Notifications</h4><span class="notif-badge" id="notifBadge">3 New</span></div>
+      <div id="notifSignInBanner" style="display:none;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:.7rem .9rem;margin-bottom:1rem;font-size:.78rem;color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:space-between;gap:.6rem">
+        <span>🔒 Sign in to personalize these around your dosha</span>
+        <button onclick="openAuth('login')" style="background:var(--gold);color:#000;border:none;border-radius:20px;padding:.3rem .8rem;font-size:.72rem;font-weight:700;cursor:pointer;flex-shrink:0">Sign In</button>
+      </div>
+      <div class="notif-tabs">
+        <button class="ntab on" onclick="ntab(this,'all')">All</button>
+        <button class="ntab" onclick="ntab(this,'remind')">Reminders</button>
+        <button class="ntab" onclick="ntab(this,'offer')">Offers</button>
+      </div>
+      <div id="nlist"><!-- populated by renderNotifications() --></div>
+      <div class="toggles">
+        <div class="trow"><div class="trow-label">Daily herb reminders<small>Morning & evening</small></div><label class="tog"><input type="checkbox" id="togHerb" onchange="tog(this,'herb reminders','herb')"><span class="ts"></span></label></div>
+        <div class="trow"><div class="trow-label">Seasonal updates<small>Quarterly guidance</small></div><label class="tog"><input type="checkbox" id="togSeasonal" onchange="tog(this,'seasonal updates','seasonal')"><span class="ts"></span></label></div>
+        <div class="trow"><div class="trow-label">Restock alerts<small>When favourites return</small></div><label class="tog"><input type="checkbox" id="togRestock" onchange="tog(this,'restock alerts','restock')"><span class="ts"></span></label></div>
+        <div class="trow"><div class="trow-label">Exclusive offers<small>Dosha-personalised deals</small></div><label class="tog"><input type="checkbox" id="togOffers" onchange="tog(this,'offers','offers')"><span class="ts"></span></label></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PAYMENT -->
+<section class="pay-section rv" id="pay">
+  <div class="sec-center">
+    <div class="sec-label">Secure Checkout</div>
+    <h2 style="font-size:clamp(1.8rem,3vw,2.4rem);font-weight:800;color:#fff">Seamless Payment Gateway</h2>
+    <p style="color:rgba(255,255,255,.45);font-size:.92rem;margin-top:.5rem">UPI, cards, net banking — all secured with bank-level encryption.</p>
+  </div>
+  <div class="pay-grid">
+    <div class="rv">
+      <div class="pay-feats">
+        <div class="pf"><div class="pf-ic">🔒</div>256-bit SSL on all transactions</div>
+        <div class="pf"><div class="pf-ic">⚡</div>Instant UPI via Razorpay</div>
+        <div class="pf"><div class="pf-ic">📱</div>GPay, PhonePe, Paytm supported</div>
+        <div class="pf"><div class="pf-ic">🔄</div>Easy refunds within 5–7 days</div>
+        <div class="pf"><div class="pf-ic">🛡</div>PCI DSS compliant infrastructure</div>
+      </div>
+    </div>
+    <div class="pay-card rv" style="transition-delay:.15s">
+      <h4>Complete Your Order</h4>
+      <div class="pm-tabs">
+        <button class="pm on" onclick="pm(this,'card')">💳 Card</button>
+        <button class="pm" onclick="pm(this,'upi')">📱 UPI</button>
+        <button class="pm" onclick="pm(this,'bank')">🏦 Net Banking</button>
+      </div>
+      <div id="pay-card-panel">
+        <div class="prow"><label>Cardholder Name</label><input class="pi" id="p-name" placeholder="Your full name"></div>
+        <div class="prow"><label>Card Number</label><input class="pi" id="p-num" placeholder="1234 5678 9012 3456" maxlength="19" oninput="fmt(this)"></div>
+        <div class="pr2">
+          <div class="prow"><label>Expiry</label><input class="pi" id="p-exp" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"></div>
+          <div class="prow"><label>CVV</label><input class="pi" id="p-cvv" placeholder="•••" maxlength="3" type="password"></div>
+        </div>
+      </div>
+      <div id="pay-upi-panel" style="display:none">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+          <button class="pm on" onclick="selUpi(this,'gpay')">Google Pay</button>
+          <button class="pm" onclick="selUpi(this,'phonepe')">PhonePe</button>
+          <button class="pm" onclick="selUpi(this,'paytm')">Paytm</button>
+          <button class="pm" onclick="selUpi(this,'bhim')">BHIM</button>
+        </div>
+        <div class="prow"><label>UPI ID</label><input class="pi" id="p-upi" placeholder="yourname@upi"></div>
+        <div style="background:rgba(201,168,76,.08);border-radius:10px;padding:.85rem;margin-top:.6rem;font-size:.8rem;color:rgba(255,255,255,.55);line-height:1.6">You'll receive a payment request on your UPI app. Approve it to complete your order.</div>
+      </div>
+      <div id="pay-bank-panel" style="display:none">
+        <div class="prow"><label>Select Your Bank</label>
+          <select class="pi" id="p-bank" style="cursor:pointer">
+            <option value="">— Choose bank —</option>
+            <option>State Bank of India (SBI)</option>
+            <option>HDFC Bank</option>
+            <option>ICICI Bank</option>
+            <option>Axis Bank</option>
+            <option>Kotak Mahindra Bank</option>
+            <option>Punjab National Bank</option>
+            <option>Bank of Baroda</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div style="background:rgba(201,168,76,.08);border-radius:10px;padding:.85rem;margin-top:.6rem;font-size:.8rem;color:rgba(255,255,255,.55);line-height:1.6">You'll be redirected to your bank's secure login page to authorize the payment.</div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:.85rem;margin:.8rem 0;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.82rem;color:rgba(255,255,255,.5)">Order Total</span>
+        <span id="payTotalDisplay" style="font-size:1.05rem;font-weight:700;color:var(--gold)">₹0</span>
+      </div>
+      <button class="pbtn" id="simulateBtn" onclick="pay()">🔒 Simulate Payment</button>
+      <div class="psec">🛡 Offline demo — instant, no network call</div>
+
+      <div style="display:flex;align-items:center;gap:.8rem;margin:1.1rem 0">
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
+        <span style="font-size:.68rem;letter-spacing:.06em;color:rgba(255,255,255,.35)">OR PAY FOR REAL · TEST MODE</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
+      </div>
+      <button class="pbtn" id="razorpayBtn" onclick="payWithRazorpay()" style="background:#3395FF;color:#fff">⚡ Pay <span id="rzpAmount">₹0</span> with Razorpay</button>
+      <div class="psec">🛡 Real Checkout widget · <span id="rzpConfigStatus">checking config…</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testis rv">
+  <div class="sec-center">
+    <div class="sec-label">Community Love</div>
+    <h2>What Our Users Say</h2>
+    <p>Thousands have transformed their wellness journey with AyurWell.</p>
+  </div>
+  <div class="tgrid">
+    <div class="tcard rv" style="transition-delay:.1s">
+      <div class="tstars">★★★★★</div>
+      <p class="tquote">"The dosha quiz changed my life. I finally understand my body — and the morning herb reminders keep me consistent every single day."</p>
+      <div class="tauthor"><div class="tav" style="background:#1A5E7A">PR</div><div><div class="tname">Priya Rajan</div><div class="tdesc">Vata · Mumbai</div></div></div>
+    </div>
+    <div class="tcard rv" style="transition-delay:.2s">
+      <div class="tstars">★★★★★</div>
+      <p class="tquote">"UPI checkout is so smooth. Got my Triphala the next morning. The crystal shop UI is absolutely stunning — unlike anything I've seen."</p>
+      <div class="tauthor"><div class="tav" style="background:#8B3A10">AK</div><div><div class="tname">Arjun Khanna</div><div class="tdesc">Pitta · Delhi</div></div></div>
+    </div>
+    <div class="tcard rv" style="transition-delay:.3s">
+      <div class="tstars">★★★★★</div>
+      <p class="tquote">"The seasonal reminders are genius. When Kapha season shifts I get notified to change my routine. Feels like a personal Ayurvedic coach."</p>
+      <div class="tauthor"><div class="tav" style="background:#1A5E1A">SM</div><div><div class="tname">Sneha Mehta</div><div class="tdesc">Kapha · Pune</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="flogo">Ayur<span>Well</span></div>
+  <p>Your modern guide to ancient Ayurvedic wellness</p>
+  <div class="flinks">
+    <a href="#">Home</a><a href="#" onclick="event.preventDefault();openAuth('signup')">About</a><a href="#catalog">Shop</a><a href="#">Articles</a><a href="#">Privacy</a><a href="#">Contact</a>
+  </div>
+  <div class="fbot">© 2025 AyurWell · Not a substitute for professional medical advice · Made with 🌿 in India</div>
+</footer>
+
+<!-- ============ NEW: AUTH MODAL (Login / Signup) ============ -->
+<div id="authModal" class="app-modal-overlay" onclick="if(event.target===this)closeAuth()">
+  <div class="bg-[#111810] border border-gold/20 rounded-2xl max-w-md w-full p-7 relative">
+    <button onclick="closeAuth()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20">✕</button>
+    <div class="text-center mb-6">
+      <div class="text-3xl mb-2">🌿</div>
+      <h3 class="font-display text-xl font-bold text-white" id="authTitle">Welcome Back</h3>
+      <p class="text-white/40 text-xs mt-1" id="authSub">Sign in to track your dosha, orders & routines</p>
+    </div>
+    <div class="flex bg-white/5 rounded-full p-1 mb-6 text-sm font-semibold">
+      <button id="authTabLogin" onclick="switchAuthTab('login')" class="tab-btn flex-1 py-2 rounded-full active">Sign In</button>
+      <button id="authTabSignup" onclick="switchAuthTab('signup')" class="tab-btn flex-1 py-2 rounded-full text-white/50">Create Account</button>
+    </div>
+    <div id="authFormArea"></div>
+  </div>
+</div>
+
+<!-- ============ NEW: DASHBOARD ============ -->
+<div id="dashboardModal" class="app-modal-overlay" onclick="if(event.target===this)closeDashboard()">
+  <div class="bg-[#0D1310] border border-gold/20 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col md:flex-row relative">
+    <button onclick="closeDashboard()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 z-10">✕</button>
+    <!-- Sidebar -->
+    <div class="w-full md:w-56 bg-black/20 p-5 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible border-b md:border-b-0 md:border-r border-white/5 shrink-0">
+      <div class="hidden md:flex items-center gap-3 mb-6">
+        <div class="w-11 h-11 rounded-full avatar-ring flex items-center justify-center shrink-0"><div class="w-9 h-9 rounded-full bg-[#0D1310] flex items-center justify-center text-sm font-bold text-gold" id="dashAvatar">?</div></div>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-white truncate" id="dashName">Guest</div>
+          <div class="text-xs text-white/40 truncate" id="dashEmail">—</div>
+        </div>
+      </div>
+      <button data-tab="profile" onclick="switchDashTab('profile')" class="dash-tab text-left text-sm px-3 py-2 rounded-lg text-white/60 border-l-2 border-transparent whitespace-nowrap">👤 Profile</button>
+      <button data-tab="orders" onclick="switchDashTab('orders')" class="dash-tab text-left text-sm px-3 py-2 rounded-lg text-white/60 border-l-2 border-transparent whitespace-nowrap">📦 My Orders</button>
+      <button data-tab="appointments" onclick="switchDashTab('appointments')" class="dash-tab text-left text-sm px-3 py-2 rounded-lg text-white/60 border-l-2 border-transparent whitespace-nowrap">🩺 Appointments</button>
+      <button data-tab="dosha" onclick="switchDashTab('dosha')" class="dash-tab text-left text-sm px-3 py-2 rounded-lg text-white/60 border-l-2 border-transparent whitespace-nowrap">☯️ Dosha History</button>
+      <button data-tab="routine" onclick="switchDashTab('routine')" class="dash-tab text-left text-sm px-3 py-2 rounded-lg text-white/60 border-l-2 border-transparent whitespace-nowrap">✅ Routine Tracker</button>
+      <button onclick="logout()" class="mt-auto text-left text-sm px-3 py-2 rounded-lg text-red-400/70 hover:text-red-400 whitespace-nowrap">↪ Log Out</button>
+    </div>
+    <!-- Content -->
+    <div class="flex-1 p-6 md:p-8 overflow-y-auto app-scroll" id="dashContent"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
